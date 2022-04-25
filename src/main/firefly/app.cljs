@@ -9,12 +9,13 @@
     "I have " [:strong "bold"]
     [:span {:style {:color "red"}} " and red "] "text."]])
 
-(defn ^:export run []
+(defn ^:dev/after-load run []
   (rdom/render [simple-component] (js/document.getElementById "app")))
 
 (comment
   ;; switch to CLJS REPL
   (shadow/repl :app)
+  (js/alert "Bonjour from REPL")
 
   (println {:a 444 :b 88})
   )
