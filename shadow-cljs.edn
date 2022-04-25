@@ -5,12 +5,12 @@
   "src/test"]
 
  :dependencies
- []
+ [[reagent "1.1.1"]]
 
  :dev-http {8080 "public"}
  :nrepl {:port 5566}
  :builds
- {:firefly
+ {:app
   {:target :browser
-   :modules {:main {:init-fn firefly.app/init}}
+   :modules {:main {:init-fn firefly.app/run}}
    }}}
