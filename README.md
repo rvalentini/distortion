@@ -5,18 +5,18 @@ This is an animation project for exploring optical distortion using shadow-cljs 
 ## Usage
 This command will start the dev process, which will start an nREPL, build the cljs sources and recompile on every file change:
 ```bash
-npx shadow-cljs watch app
+clj -M:shadow-cljs watch app
 ```
+Note: The command `npx shadow-cljs watch app` is used when using shadow-cljs for dependency management.\
+
 Application is available on port `8080`
 
 ## IntelliJ spcific setup
 
-1. Generate POM.xml file with shadow-cljs
-```bash
-npx shadow-cljs pom
-```
-2. Prepare run configuration to connect to REPL that was started by the watch cmd
-3. When connected to the nREPL upgrade from CLJ REPL to CLJS REPL by sending
+### dependencies via pom.xml
+
+1. Prepare run configuration to connect to REPL that was started by the watch command.
+2. When connected to the nREPL upgrade from CLJ REPL to CLJS REPL by sending
 ```clojure
 (shadow/repl :app)
 ```

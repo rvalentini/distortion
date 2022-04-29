@@ -1,13 +1,5 @@
 ;; shadow-cljs configuration
-{:source-paths
- ["src/dev"
-  "src/main"
-  "src/test"]
-
- :dependencies
- [[reagent "1.1.1"]
-  [quil "3.1.0"]]
-
+{:deps true
  :dev-http {8080 "public"}
  :nrepl {:port 5566}
  :builds
