@@ -6,12 +6,14 @@
 
 (defn diamond-background []
   (let [steps (range 0 510 10)
-        points-along-x (map #(identity [0 %]) steps)
-        points-along-y (map #(identity [% 0]) steps)]
+        points-along-x (mapcat #(identity [[0 %] [500 %]]) steps)
+        points-along-y (mapcat #(identity [[% 0] [% 500]]) steps)]
     (q/stroke 50 0 0)
     (q/stroke-weight 2)
     (doseq [[p1 p2] (map vector points-along-x points-along-y)]
-      (q/line p1 p2))))
+      (q/line p1 p2)
+      #_(q/with-rotation [(- q/HALF-PI)]
+        (q/line p1 p2)))))
 
 (defn setup []
   (q/smooth)
