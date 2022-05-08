@@ -4,34 +4,43 @@
             [quil.core :as q]
             [quil.middleware :as m]))
 
+(def width 500)
+(def height 500)
+(def blackish [50 0 0])
+
+; TODO use width and height instead
+; TODO idea: color blocks by finding closest square limits surrounding a given point
+
 (defn diamond-background []
-  (let [steps (range 0 510 10)
-        points-along-x (mapcat #(identity [[0 %] [500 %]]) steps)
-        points-along-y (mapcat #(identity [[% 0] [% 500]]) steps)]
-    (q/stroke 50 0 0)
+  (let [steps (range 0 510 20)
+        points-along-x (mapcat (fn [s] [[0 s] [width s]]) steps)
+        points-along-y (mapcat (fn [s] [[s 0] [s height]]) steps)]
+    (q/stroke blackish)
     (q/stroke-weight 2)
     (doseq [[p1 p2] (map vector points-along-x points-along-y)]
       (q/line p1 p2)
-      #_(q/with-rotation [(- q/HALF-PI)]
-        (q/line p1 p2)))))
+      (q/with-rotation [(- q/HALF-PI)]
+        (q/with-translation [(- height) 0]
+          (q/line p1 p2))))))
 
 (defn setup []
   (q/smooth)
   (q/background 230 230 230)
-  (diamond-background))
+  (q/with-translation [250 250]
+    (diamond-background)))
 
 (defn canvas []
   (r/create-class
     {:component-did-mount
      (fn [component]
        (let [node (rdom/dom-node component)
-             width 500
-             height 500]
+             c-width (* 2 width)
+             c-height (* 2 height)]
          (q/sketch
            :title "Red cross"
            :host node
            :setup setup
-           :size [width height]
+           :size [c-width c-height]
            :middleware [m/fun-mode])))
      :render
      (fn [] [:div])}))
