@@ -7,12 +7,22 @@
 (def width 500)
 (def height 500)
 (def steps 80)
-(def blackish [50 0 0])
 
-; TODO use width and height instead
 ; TODO make it move
-; TODO idea: color blocks by finding closest square limits surrounding a given point
 ; TODO idea: combine multiple distortions in sequence
+
+(def colors {:blackish [50 0 0]
+             :yellow [244 226 133]
+             :orange [244 162 89]
+             :blue   [180 210 231]})
+
+(defn colorize [[p1-x p1-y] [p2-x p2-y]]
+  (let [dist (Math/sqrt (+ (Math/pow (- p1-y p2-y) 2) (Math/pow (- p1-x p2-x) 2)))
+        relative-dist (/ dist (Math/sqrt (+ (Math/pow (* 0.5 height) 2) (Math/pow (* 0.5 width) 2))))]
+    ((cond
+       (< relative-dist 0.3) :orange
+       (>= 0.7 relative-dist 0.3) :blue
+       :else :yellow) colors)))
 
 (defn barrel-like-dist [undistorted]
   (+ undistorted (* 2 (Math/pow (Math/log undistorted) 2))))
@@ -35,20 +45,15 @@
 (defn get-neighbors [[x y] points]
   (map #(get-in points %) [[x (dec y)] [(dec x) y] [(inc x) y] [x (inc y)]]))
 
-(defn draw-quad [[[t1 t2] [l1 l2] [r1 r2] [b1 b2] ]]
+(defn draw-quad [[[t1 t2] [l1 l2] [r1 r2] [b1 b2]]]
   (q/quad t1 t2 r1 r2 b1 b2 l1 l2))
 
 (defn draw-diamond [diamond]
   (when (every? some? diamond)
-    (q/with-fill ["yellow"] (draw-quad diamond))))
+    (q/with-fill [(colorize (first diamond) [250 250])] (draw-quad diamond))))
 
 (defn diamond-centers []
   (filter (fn [p] (every? even? p)) (for [i (range 0 steps) j (range 0 steps)] [i j])))
-
-(defn filter-center-points [points]
-  (mapv
-    (fn [[idx row]] (vec (take-nth 2 (if (even? idx) row (rest row)))))
-    (map-indexed vector points)))
 
 ; (1) generate matrix as vec of vecs
 ; (2) distort points
@@ -61,16 +66,19 @@
   (let [points (vec (for [x (range 0 steps)]
                       (vec (for [y (range 0 steps)] [(* (/ width steps) x) (* (/ height steps) y)]))))
         distorted (mapv #(mapv (fn [p] (distort p barrel-like-dist [250 250])) %) points)
-        centers (diamond-centers)
-        diamonds (map #(get-neighbors % distorted) centers)]
-    (q/stroke blackish)
+        centers (diamond-centers)]
+    (q/stroke (:blackish colors))
     (q/stroke-weight 2)
+    (doseq [c centers]
+      (draw-diamond (get-neighbors c distorted)))
     (q/with-stroke ["green"]
       (q/stroke-weight 5)
-      (q/point 250 250))
-    (q/stroke-weight 2)
-    (doseq [d diamonds]
-      (draw-diamond d))))
+      (q/point 250 250))))
+
+(defn debug-mark-center []
+  (q/with-stroke ["green"]
+    (q/stroke-weight 5)
+    (q/point 250 250)))
 
 (defn debug-mark-origin []
   (q/stroke "red")
@@ -81,8 +89,9 @@
   (q/smooth)
   (q/background 230 230 230)
   (q/with-translation [250 250]
+    (diamonds)
     (debug-mark-origin)
-    (diamonds)))
+    (debug-mark-center)))
 
 (defn canvas []
   (r/create-class
@@ -112,11 +121,7 @@
   (def test-vec (vec (for [i (range 0 5)]
                        (vec (for [j (range 0 5)] [i j])))))
 
-  (cljs.pprint/pprint (filter-center-points test-vec))
-
+  (colorize [24 24] [250 250])
   (diamond-centers)
-  points
-  (get-neighbors [0 0] points)
   test-vec
-  (mapv (fn [[idx row]] (vec (take-nth 2 (if (even? idx) row (rest row))))) (map-indexed vector test-vec))
   )
