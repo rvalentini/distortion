@@ -6,6 +6,7 @@
 
 (def width 500)
 (def height 500)
+(def steps 50)
 (def blackish [50 0 0])
 
 ; TODO use width and height instead
@@ -34,11 +35,10 @@
 (defn get-neighbors [[x y] points]
   (map #(get-in points %) [[x (dec y)] [(dec x) y] [(inc x) y] [x (inc y)]]))
 
-(defn draw-quad [[[t1 t2] [r1 r2] [b1 b2] [l1 l2]]]
+(defn draw-quad [[[t1 t2] [l1 l2] [r1 r2] [b1 b2] ]]
   (q/quad t1 t2 r1 r2 b1 b2 l1 l2))
 
 (defn draw-diamond [[t l r _ :as diamond]]
-  (println diamond)                                         ;TODO fix case all nil should not happen
   (when (some? t)
     (when (some? l)
       (q/with-stroke ["blue"]
@@ -48,6 +48,9 @@
         (q/line t r)))
     (when (every? some? diamond)
       (q/with-fill ["yellow"] (draw-quad diamond)))))
+
+(defn diamond-centers []
+  (filter (fn [p] (every? even? p)) (for [i (range 0 steps) j (range 0 steps)] [i j])))
 
 (defn filter-center-points [points]
   (mapv
@@ -62,14 +65,11 @@
 
 (defn diamonds []
   ;TODO use threading
-  (let [steps (range 0 50)                                  ;TODO increase
-        points (vec (for [x steps]
-                      (vec (for [y steps] [(* 10 x) (* 10 y)]))))
-        distorted (map #(map (fn [p] (distort p barrel-like-dist [250 250])) %) points)
-        center-points (filter-center-points distorted)
-        diamonds (for [i (range 0 50)
-                       j (range 0 50)]
-                   (get-neighbors [i j] center-points))]
+  (let [points (vec (for [x (range 0 steps)]
+                      (vec (for [y (range 0 steps)] [(* 10 x) (* 10 y)]))))
+        distorted (mapv #(mapv (fn [p] (distort p barrel-like-dist [250 250])) %) points)
+        centers (diamond-centers)
+        diamonds (map #(get-neighbors % distorted) centers)]
     (q/stroke blackish)
     (q/stroke-weight 2)
     (q/with-stroke ["green"]
@@ -115,14 +115,15 @@
   ;; switch to CLJS REPL
   (shadow/repl :app)
   (js/alert "Bonjour from REPL")
-
+  (even? 0)
   (def test-vec (vec (for [i (range 0 5)]
                        (vec (for [j (range 0 5)] [i j])))))
 
+  (cljs.pprint/pprint (filter-center-points test-vec))
+
+  (diamond-centers)
+  points
+  (get-neighbors [0 0] points)
   test-vec
   (mapv (fn [[idx row]] (vec (take-nth 2 (if (even? idx) row (rest row))))) (map-indexed vector test-vec))
-
-
-  (def p1 [270 270])
-  (distort [1 1] 0.1 [250 250])
-  (println {:a 444 :b 88}))
+  )
