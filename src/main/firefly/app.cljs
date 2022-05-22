@@ -25,7 +25,7 @@
        :else :yellow) colors)))
 
 (defn barrel-like-dist [undistorted]
-  (+ undistorted (* 2 (Math/pow (Math/log undistorted) 2))))
+  (+ undistorted (* 2 (Math/pow (Math/log undistorted) 2)) (* 5 (Math/log undistorted))))
 
 (defn pincushion-like-dist [undistorted]
   (+ undistorted (/ (Math/pow undistorted 2) 300)))
