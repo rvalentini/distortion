@@ -6,7 +6,7 @@
 
 (def width 500)
 (def height 500)
-(def steps 50)
+(def steps 80)
 (def blackish [50 0 0])
 
 ; TODO use width and height instead
@@ -38,16 +38,9 @@
 (defn draw-quad [[[t1 t2] [l1 l2] [r1 r2] [b1 b2] ]]
   (q/quad t1 t2 r1 r2 b1 b2 l1 l2))
 
-(defn draw-diamond [[t l r _ :as diamond]]
-  (when (some? t)
-    (when (some? l)
-      (q/with-stroke ["blue"]
-        (q/line t l)))
-    (when (some? r)
-      (q/with-stroke ["blue"]
-        (q/line t r)))
-    (when (every? some? diamond)
-      (q/with-fill ["yellow"] (draw-quad diamond)))))
+(defn draw-diamond [diamond]
+  (when (every? some? diamond)
+    (q/with-fill ["yellow"] (draw-quad diamond))))
 
 (defn diamond-centers []
   (filter (fn [p] (every? even? p)) (for [i (range 0 steps) j (range 0 steps)] [i j])))
@@ -66,7 +59,7 @@
 (defn diamonds []
   ;TODO use threading
   (let [points (vec (for [x (range 0 steps)]
-                      (vec (for [y (range 0 steps)] [(* 10 x) (* 10 y)]))))
+                      (vec (for [y (range 0 steps)] [(* (/ width steps) x) (* (/ height steps) y)]))))
         distorted (mapv #(mapv (fn [p] (distort p barrel-like-dist [250 250])) %) points)
         centers (diamond-centers)
         diamonds (map #(get-neighbors % distorted) centers)]
