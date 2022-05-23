@@ -6,9 +6,11 @@
 
 (def width 500)
 (def height 500)
-(def steps 80)
+(def steps 50)
+(def fps 20)
 
-; TODO make it move
+(defonce state (r/atom {:center [0 0]}))
+
 ; TODO idea: combine multiple distortions in sequence
 
 (def colors {:blackish [50 0 0]
@@ -16,8 +18,9 @@
              :orange [244 162 89]
              :blue   [180 210 231]})
 
-(defn colorize [[p1-x p1-y] [p2-x p2-y]]
-  (let [dist (Math/sqrt (+ (Math/pow (- p1-y p2-y) 2) (Math/pow (- p1-x p2-x) 2)))
+(defn colorize [[p1-x p1-y]]
+  (let [[p2-x p2-y] (:center @state)
+        dist (Math/sqrt (+ (Math/pow (- p1-y p2-y) 2) (Math/pow (- p1-x p2-x) 2)))
         relative-dist (/ dist (Math/sqrt (+ (Math/pow (* 0.5 height) 2) (Math/pow (* 0.5 width) 2))))]
     ((cond
        (< relative-dist 0.3) :orange
@@ -50,30 +53,21 @@
 
 (defn draw-diamond [diamond]
   (when (every? some? diamond)
-    (q/with-fill [(colorize (first diamond) [250 250])] (draw-quad diamond))))
+    (q/with-fill [(colorize (first diamond))] (draw-quad diamond))))
 
 (defn diamond-centers []
   (filter (fn [p] (every? even? p)) (for [i (range 0 steps) j (range 0 steps)] [i j])))
-
-; (1) generate matrix as vec of vecs
-; (2) distort points
-; (3) get uneven points in uneven rows and even in even
-; (4) map to get-neighbors for these points
-; (5) apply draw logic depending if [T L R B] exist + color coding depending on distance
 
 (defn diamonds []
   ;TODO use threading
   (let [points (vec (for [x (range 0 steps)]
                       (vec (for [y (range 0 steps)] [(* (/ width steps) x) (* (/ height steps) y)]))))
-        distorted (mapv #(mapv (fn [p] (distort p barrel-like-dist [250 250])) %) points)
+        distorted (mapv #(mapv (fn [p] (distort p barrel-like-dist (:center @state))) %) points)
         centers (diamond-centers)]
     (q/stroke (:blackish colors))
     (q/stroke-weight 2)
     (doseq [c centers]
-      (draw-diamond (get-neighbors c distorted)))
-    (q/with-stroke ["green"]
-      (q/stroke-weight 5)
-      (q/point 250 250))))
+      (draw-diamond (get-neighbors c distorted)))))
 
 (defn debug-mark-center []
   (q/with-stroke ["green"]
@@ -85,9 +79,18 @@
   (q/stroke-weight 5)
   (q/point 0 0))
 
+(defn update-state [state]
+  (swap! state  #(update % :center (fn [[x y]] [(+ 1 x) (+ 1 y)])))
+  state)
+
 (defn setup []
   (q/smooth)
+  (q/frame-rate fps)
   (q/background 230 230 230)
+  state)
+
+(defn draw []
+  (q/clear)
   (q/with-translation [250 250]
     (diamonds)
     (debug-mark-origin)
@@ -103,7 +106,9 @@
          (q/sketch
            :title "Red cross"
            :host node
+           :update update-state
            :setup setup
+           :draw draw
            :size [c-width c-height]
            :middleware [m/fun-mode])))
      :render
@@ -111,7 +116,7 @@
 
 
 (defn ^:dev/after-load run []
-  (rdom/render [canvas] (js/document.getElementById "app")))
+  (rdom/render [canvas state] (js/document.getElementById "app")))
 
 (comment
   ;; switch to CLJS REPL
@@ -120,8 +125,6 @@
   (even? 0)
   (def test-vec (vec (for [i (range 0 5)]
                        (vec (for [j (range 0 5)] [i j])))))
-
-  (colorize [24 24] [250 250])
   (diamond-centers)
   test-vec
   )
