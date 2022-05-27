@@ -6,7 +6,7 @@
 
 (def width 500)
 (def height 500)
-(def steps 50)
+(def steps 80)
 (def fps 20)
 
 (defonce state (r/atom {:center [0 0]}))
@@ -14,9 +14,9 @@
 ; TODO idea: combine multiple distortions in sequence
 
 (def colors {:blackish [50 0 0]
-             :yellow [244 226 133]
-             :orange [244 162 89]
-             :blue   [180 210 231]})
+             :yellow   [244 226 133]
+             :orange   [244 162 89]
+             :blue     [180 210 231]})
 
 (defn colorize [[p1-x p1-y]]
   (let [[p2-x p2-y] (:center @state)
@@ -24,7 +24,7 @@
         relative-dist (/ dist (Math/sqrt (+ (Math/pow (* 0.5 height) 2) (Math/pow (* 0.5 width) 2))))]
     ((cond
        (< relative-dist 0.3) :orange
-       (>= 0.7 relative-dist 0.3) :blue
+       (>= 0.5 relative-dist 0.3) :blue
        :else :yellow) colors)))
 
 (defn barrel-like-dist [undistorted]
@@ -58,11 +58,9 @@
 (defn diamond-centers []
   (filter (fn [p] (every? even? p)) (for [i (range 0 steps) j (range 0 steps)] [i j])))
 
-(defn diamonds []
+(defn diamonds [points]
   ;TODO use threading
-  (let [points (vec (for [x (range 0 steps)]
-                      (vec (for [y (range 0 steps)] [(* (/ width steps) x) (* (/ height steps) y)]))))
-        distorted (mapv #(mapv (fn [p] (distort p barrel-like-dist (:center @state))) %) points)
+  (let [distorted (mapv #(mapv (fn [p] (distort p barrel-like-dist (:center @state))) %) points)
         centers (diamond-centers)]
     (q/stroke (:blackish colors))
     (q/stroke-weight 2)
@@ -80,7 +78,7 @@
   (q/point 0 0))
 
 (defn update-state [state]
-  (swap! state  #(update % :center (fn [[x y]] [(+ 1 x) (+ 1 y)])))
+  (swap! state #(update % :center (fn [[x y]] [(+ 1 x) (+ 1 y)])))
   state)
 
 (defn setup []
@@ -89,12 +87,19 @@
   (q/background 230 230 230)
   state)
 
-(defn draw []
+(defn draw [points]
   (q/clear)
   (q/with-translation [250 250]
-    (diamonds)
+    (diamonds points)
     (debug-mark-origin)
     (debug-mark-center)))
+
+(defn lattice []
+  (let [r (range 0 steps)]
+    (vec (for [x r]
+           (vec (for [y r]
+                  [(* (/ width steps) x)
+                   (* (/ height steps) y)]))))))
 
 (defn canvas []
   (r/create-class
@@ -108,7 +113,7 @@
            :host node
            :update update-state
            :setup setup
-           :draw draw
+           :draw #(draw (lattice))
            :size [c-width c-height]
            :middleware [m/fun-mode])))
      :render
