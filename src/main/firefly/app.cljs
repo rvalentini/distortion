@@ -9,7 +9,8 @@
 (def steps 80)
 (def fps 20)
 
-(defonce state (r/atom {:center [0 0]}))
+(defonce state (r/atom {:center {:angle 0
+                                 :r 150}}))
 
 ; TODO idea: combine multiple distortions in sequence
 
@@ -18,8 +19,13 @@
              :orange   [244 162 89]
              :blue     [180 210 231]})
 
+(defn pol->cart [{:keys [angle r]}]
+  (let [x (+ (/ width 2) (* r (Math/cos angle)))
+        y (+ (/ height 2) (* r (Math/sin angle)))]
+    [x y]))
+
 (defn colorize [[p1-x p1-y]]
-  (let [[p2-x p2-y] (:center @state)
+  (let [[p2-x p2-y] (pol->cart (:center @state))
         dist (Math/sqrt (+ (Math/pow (- p1-y p2-y) 2) (Math/pow (- p1-x p2-x) 2)))
         relative-dist (/ dist (Math/sqrt (+ (Math/pow (* 0.5 height) 2) (Math/pow (* 0.5 width) 2))))]
     ((cond
@@ -62,7 +68,7 @@
   (mapv (fn [row] (mapv (fn [point] (f point)) row)) matrix))
 
 (defn draw-diamonds [points centers]
-  (let [distorted (map-each-point (fn [p] (distort p barrel-like-dist (:center @state))) points )]
+  (let [distorted (map-each-point (fn [p] (distort p barrel-like-dist (pol->cart (:center @state)))) points)]
     (q/stroke (:blackish colors))
     (q/stroke-weight 2)
     (doseq [c centers]
@@ -78,8 +84,11 @@
   (q/stroke-weight 5)
   (q/point 0 0))
 
+(defn move [center]
+  (update center :angle #(mod (+ % (/ Math/PI 100)) (* 2 Math/PI))))
+
 (defn update-state [state]
-  (swap! state #(update % :center (fn [[x y]] [(+ 2 x) (+ 2 y)])))
+  (swap! state #(update % :center move))
   state)
 
 (defn setup []
@@ -114,7 +123,7 @@
            :host node
            :update update-state
            :setup setup
-           :draw #(draw {:points (lattice)
+           :draw #(draw {:points  (lattice)
                          :centers (diamond-centers)})
            :size [c-width c-height]
            :middleware [m/fun-mode])))
