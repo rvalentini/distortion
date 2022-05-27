@@ -58,10 +58,11 @@
 (defn diamond-centers []
   (filter (fn [p] (every? even? p)) (for [i (range 0 steps) j (range 0 steps)] [i j])))
 
-(defn diamonds [points]
-  ;TODO use threading
-  (let [distorted (mapv #(mapv (fn [p] (distort p barrel-like-dist (:center @state))) %) points)
-        centers (diamond-centers)]
+(defn map-each-point [f matrix]
+  (mapv (fn [row] (mapv (fn [point] (f point)) row)) matrix))
+
+(defn draw-diamonds [points centers]
+  (let [distorted (map-each-point (fn [p] (distort p barrel-like-dist (:center @state))) points )]
     (q/stroke (:blackish colors))
     (q/stroke-weight 2)
     (doseq [c centers]
@@ -78,7 +79,7 @@
   (q/point 0 0))
 
 (defn update-state [state]
-  (swap! state #(update % :center (fn [[x y]] [(+ 1 x) (+ 1 y)])))
+  (swap! state #(update % :center (fn [[x y]] [(+ 2 x) (+ 2 y)])))
   state)
 
 (defn setup []
@@ -87,10 +88,10 @@
   (q/background 230 230 230)
   state)
 
-(defn draw [points]
+(defn draw [{:keys [points centers]}]
   (q/clear)
   (q/with-translation [250 250]
-    (diamonds points)
+    (draw-diamonds points centers)
     (debug-mark-origin)
     (debug-mark-center)))
 
@@ -113,7 +114,8 @@
            :host node
            :update update-state
            :setup setup
-           :draw #(draw (lattice))
+           :draw #(draw {:points (lattice)
+                         :centers (diamond-centers)})
            :size [c-width c-height]
            :middleware [m/fun-mode])))
      :render
