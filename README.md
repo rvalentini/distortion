@@ -1,4 +1,4 @@
-# Firefly
+# Distortion animation
 
 This is an animation project for exploring optical distortion using shadow-cljs and Quil.
 

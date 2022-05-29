@@ -5,5 +5,5 @@
  :builds
  {:app
   {:target :browser
-   :modules {:main {:init-fn firefly.app/run}}
+   :modules {:main {:init-fn distortion.app/run}}
    }}}

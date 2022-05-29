@@ -1,4 +1,4 @@
-(ns firefly.app
+(ns distortion.app
   (:require [reagent.core :as r]
             [reagent.dom :as rdom]
             [quil.core :as q]
