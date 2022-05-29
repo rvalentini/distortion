@@ -9,24 +9,25 @@
 (def steps 80)
 (def fps 20)
 
-(defonce state (r/atom {:center {:angle 0
-                                 :r 150}}))
-
-; TODO idea: combine multiple distortions in sequence
-
 (def colors {:blackish [50 0 0]
              :yellow   [244 226 133]
              :orange   [244 162 89]
              :blue     [180 210 231]})
+
+(defonce state (r/atom {:center {:angle 0
+                                 :r 150}}))
+
+; TODO idea: combine multiple distortions in sequence
+; TODO rename
 
 (defn pol->cart [{:keys [angle r]}]
   (let [x (+ (/ width 2) (* r (Math/cos angle)))
         y (+ (/ height 2) (* r (Math/sin angle)))]
     [x y]))
 
-(defn colorize [[p1-x p1-y]]
-  (let [[p2-x p2-y] (pol->cart (:center @state))
-        dist (Math/sqrt (+ (Math/pow (- p1-y p2-y) 2) (Math/pow (- p1-x p2-x) 2)))
+(defn colorize [[x y]]
+  (let [[c-x c-y] (pol->cart (:center @state))
+        dist (Math/sqrt (+ (Math/pow (- y c-y) 2) (Math/pow (- x c-x) 2)))
         relative-dist (/ dist (Math/sqrt (+ (Math/pow (* 0.5 height) 2) (Math/pow (* 0.5 width) 2))))]
     ((cond
        (< relative-dist 0.3) :orange
@@ -37,22 +38,15 @@
   (+ undistorted (* 2 (Math/pow (Math/log undistorted) 2)) (* 5 (Math/log undistorted))))
 
 (defn pincushion-like-dist [undistorted]
-  (+ undistorted (/ (Math/pow undistorted 2) 300)))
+  (+ undistorted (/ (Math/pow undistorted 1.8) 300) (* 3 (- (Math/log undistorted)))))
 
 (defn distort [[x y] fn [center-x center-y]]
   (let [[v-x v-y] [(- x center-x) (- y center-y)]
         v-len (Math/sqrt (+ (Math/pow v-x 2) (Math/pow v-y 2)))
         [v-norm-x v-norm-y] [(/ v-x v-len) (/ v-y v-len)]
         distorted (fn v-len)
-        [new-v-x new-v-y] [(* distorted v-norm-x) (* distorted v-norm-y)]
-        new-p [(+ new-v-x center-x) (+ new-v-y center-y)]]
-    new-p))
-
-(defn within-bounds [location dim]
-  (every? #(< -1 % dim) location))
-
-(defn get-neighbors [[x y] points]
-  (map #(get-in points %) [[x (dec y)] [(dec x) y] [(inc x) y] [x (inc y)]]))
+        [dist-x dist-y] [(* distorted v-norm-x) (* distorted v-norm-y)]]
+    [(+ dist-x center-x) (+ dist-y center-y)]))
 
 (defn draw-quad [[[t1 t2] [l1 l2] [r1 r2] [b1 b2]]]
   (q/quad t1 t2 r1 r2 b1 b2 l1 l2))
@@ -61,28 +55,28 @@
   (when (every? some? diamond)
     (q/with-fill [(colorize (first diamond))] (draw-quad diamond))))
 
-(defn diamond-centers []
-  (filter (fn [p] (every? even? p)) (for [i (range 0 steps) j (range 0 steps)] [i j])))
-
 (defn map-each-point [f matrix]
   (mapv (fn [row] (mapv (fn [point] (f point)) row)) matrix))
 
+(defn get-neighbors [[x y] points]
+  (map #(get-in points %) [[x (dec y)] [(dec x) y] [(inc x) y] [x (inc y)]]))
+
 (defn draw-diamonds [points centers]
-  (let [distorted (map-each-point (fn [p] (distort p barrel-like-dist (pol->cart (:center @state)))) points)]
+  (let [distorted (map-each-point (fn [p] (distort p pincushion-like-dist (pol->cart (:center @state)))) points)]
     (q/stroke (:blackish colors))
     (q/stroke-weight 2)
     (doseq [c centers]
       (draw-diamond (get-neighbors c distorted)))))
 
-(defn debug-mark-center []
-  (q/with-stroke ["green"]
-    (q/stroke-weight 5)
-    (q/point 250 250)))
+(defn draw [{:keys [points centers]}]
+  (q/clear)
+  (q/background 230 230 230)
+  (q/with-translation [250 250]
+    (draw-diamonds points centers)))
 
-(defn debug-mark-origin []
-  (q/stroke "red")
-  (q/stroke-weight 5)
-  (q/point 0 0))
+(defn diamond-centers []
+  (let [r (range 0 steps)]
+    (filter (fn [p] (every? even? p)) (for [i r j r] [i j]))))
 
 (defn move [center]
   (update center :angle #(mod (+ % (/ Math/PI 100)) (* 2 Math/PI))))
@@ -94,30 +88,19 @@
 (defn setup []
   (q/smooth)
   (q/frame-rate fps)
-  (q/background 230 230 230)
   state)
 
-(defn draw [{:keys [points centers]}]
-  (q/clear)
-  (q/with-translation [250 250]
-    (draw-diamonds points centers)
-    (debug-mark-origin)
-    (debug-mark-center)))
-
 (defn lattice []
-  (let [r (range 0 steps)]
-    (vec (for [x r]
-           (vec (for [y r]
-                  [(* (/ width steps) x)
-                   (* (/ height steps) y)]))))))
+  (let [r (range 0 steps)
+        w-scale (/ width steps)
+        h-scale (/ height steps)]
+    (vec (for [x r] (vec (for [y r] [(* w-scale x) (* h-scale y)]))))))
 
 (defn canvas []
   (r/create-class
     {:component-did-mount
      (fn [component]
-       (let [node (rdom/dom-node component)
-             c-width (* 2 width)
-             c-height (* 2 height)]
+       (let [node (rdom/dom-node component)]
          (q/sketch
            :title "Red cross"
            :host node
@@ -125,11 +108,10 @@
            :setup setup
            :draw #(draw {:points  (lattice)
                          :centers (diamond-centers)})
-           :size [c-width c-height]
+           :size [(* 2 width) (* 2 height)]
            :middleware [m/fun-mode])))
      :render
      (fn [] [:div])}))
-
 
 (defn ^:dev/after-load run []
   (rdom/render [canvas state] (js/document.getElementById "app")))
@@ -137,10 +119,6 @@
 (comment
   ;; switch to CLJS REPL
   (shadow/repl :app)
-  (js/alert "Bonjour from REPL")
-  (even? 0)
-  (def test-vec (vec (for [i (range 0 5)]
-                       (vec (for [j (range 0 5)] [i j])))))
   (diamond-centers)
-  test-vec
+  (lattice)
   )
