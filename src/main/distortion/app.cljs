@@ -59,19 +59,24 @@
   (when (every? some? diamond)
     (q/with-fill [(colorize (first diamond))] (draw-quad diamond))))
 
+
 (defn map-each-point [f matrix]
   (mapv (fn [row] (mapv (fn [point] (f point)) row)) matrix))
+
+(defn apply-distortion [dist-fn center points]
+  (map-each-point (fn [p] (distort p dist-fn (pol->cart center))) points))
 
 (defn get-neighbors [[x y] points]
   (map #(get-in points %) [[x (dec y)] [(dec x) y] [(inc x) y] [x (inc y)]]))
 
 (defn draw-diamonds [points centers]
-  (let [distorted (map-each-point (fn [p] (distort p pincushion-like-dist (pol->cart (get-in @state [:alpha :center])))) points)
-        distorted-2nd (map-each-point (fn [p] (distort p barrel-like-dist (pol->cart (get-in @state [:beta :center])))) distorted)]
+  (let [distorted (->> points 
+                    (apply-distortion pincushion-like-dist (get-in @state [:alpha :center]))
+                    (apply-distortion barrel-like-dist (get-in @state [:beta :center])))]
     (q/stroke (:blackish colors))
     (q/stroke-weight 2)
     (doseq [c centers]
-      (draw-diamond (get-neighbors c distorted-2nd)))))
+      (draw-diamond (get-neighbors c distorted)))))
 
 (defn draw [{:keys [points centers]}]
   (q/clear)
