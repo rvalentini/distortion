@@ -14,11 +14,15 @@
              :orange   [244 162 89]
              :blue     [180 210 231]})
 
-(defonce state (r/atom {:center {:angle 0
-                                 :r 150}}))
+(defonce state (r/atom {:alpha {:center {:angle 0
+                                         :r     150}}
+                        :beta {:center {:angle Math/PI
+                                        :r     150}}}))
 
-; TODO idea: combine multiple distortions in sequence
-; TODO rename
+; TODO colorize separately and use colors that increase the optical magnification effect: "low" vs. "high"
+; TODO refactor double distortion
+; TODO try to increase radius of the pincushion distortion
+; TODO visualize distortion functions
 
 (defn pol->cart [{:keys [angle r]}]
   (let [x (+ (/ width 2) (* r (Math/cos angle)))
@@ -26,7 +30,7 @@
     [x y]))
 
 (defn colorize [[x y]]
-  (let [[c-x c-y] (pol->cart (:center @state))
+  (let [[c-x c-y] (pol->cart (get-in @state [:beta :center]))
         dist (Math/sqrt (+ (Math/pow (- y c-y) 2) (Math/pow (- x c-x) 2)))
         relative-dist (/ dist (Math/sqrt (+ (Math/pow (* 0.5 height) 2) (Math/pow (* 0.5 width) 2))))]
     ((cond
@@ -62,11 +66,12 @@
   (map #(get-in points %) [[x (dec y)] [(dec x) y] [(inc x) y] [x (inc y)]]))
 
 (defn draw-diamonds [points centers]
-  (let [distorted (map-each-point (fn [p] (distort p pincushion-like-dist (pol->cart (:center @state)))) points)]
+  (let [distorted (map-each-point (fn [p] (distort p pincushion-like-dist (pol->cart (get-in @state [:alpha :center])))) points)
+        distorted-2nd (map-each-point (fn [p] (distort p barrel-like-dist (pol->cart (get-in @state [:beta :center])))) distorted)]
     (q/stroke (:blackish colors))
     (q/stroke-weight 2)
     (doseq [c centers]
-      (draw-diamond (get-neighbors c distorted)))))
+      (draw-diamond (get-neighbors c distorted-2nd)))))
 
 (defn draw [{:keys [points centers]}]
   (q/clear)
@@ -82,7 +87,9 @@
   (update center :angle #(mod (+ % (/ Math/PI 100)) (* 2 Math/PI))))
 
 (defn update-state [state]
-  (swap! state #(update % :center move))
+  (swap! state #(-> %
+                  (update-in [:alpha :center] move)
+                  (update-in [:beta :center] move)))
   state)
 
 (defn setup []
