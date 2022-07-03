@@ -2,27 +2,53 @@
   (:require [reagent.core :as r]
             [reagent.dom :as rdom]
             [quil.core :as q]
-            [quil.middleware :as m]))
+            [quil.middleware :as m]
+            ["d3" :as d3]))
 
 (def width 500)
 (def height 500)
 (def steps 80)
 (def fps 20)
+(def not-zero 0.00001)
+
+
+(defn visualize-function [f]
+  (let
+    [size 300
+     data (into [] (map #(identity {:x % :y (f %)}) (range not-zero 20 0.1)))
+     x (->
+         (d3/scaleLinear)
+         (.domain (into-array [(apply min (map :x data)) (apply max (map :x data))]))
+         (.range (into-array [not-zero size])))
+     y (->
+         (d3/scaleLinear)
+         (.domain (into-array [(apply min (map :y data)) (apply max (map :y data))]))
+         (.range (into-array [size not-zero])))
+     line (->
+            (d3/line)
+            (.x (fn [d] (x (:x d))))
+            (.y (fn [d] (y (:y d)))))]
+    [:svg
+     {:viewBox (str 0 " " 0 " " size " " size)}
+     [:path
+      {:d (line data),
+       :fill "transparent",
+       :stroke (first d3/schemeCategory10)}]]))
+
 
 (def colors {:blackish [50 0 0]
-             :yellow   [244 226 133]
-             :orange   [244 162 89]
-             :blue     [180 210 231]})
+             :yellow [244 226 133]
+             :orange [244 162 89]
+             :blue [180 210 231]})
 
 (defonce state (r/atom {:alpha {:center {:angle 0
-                                         :r     150}}
+                                         :r 150}}
                         :beta {:center {:angle Math/PI
-                                        :r     150}}}))
+                                        :r 150}}}))
 
 ; TODO colorize separately and use colors that increase the optical magnification effect: "low" vs. "high"
 ; TODO refactor double distortion
 ; TODO try to increase radius of the pincushion distortion
-; TODO visualize distortion functions
 
 (defn pol->cart [{:keys [angle r]}]
   (let [x (+ (/ width 2) (* r (Math/cos angle)))
@@ -70,7 +96,7 @@
   (map #(get-in points %) [[x (dec y)] [(dec x) y] [(inc x) y] [x (inc y)]]))
 
 (defn draw-diamonds [points centers]
-  (let [distorted (->> points 
+  (let [distorted (->> points
                     (apply-distortion pincushion-like-dist (get-in @state [:alpha :center]))
                     (apply-distortion barrel-like-dist (get-in @state [:beta :center])))]
     (q/stroke (:blackish colors))
@@ -108,6 +134,19 @@
         h-scale (/ height steps)]
     (vec (for [x r] (vec (for [y r] [(* w-scale x) (* h-scale y)]))))))
 
+(defn visualize [name f]
+  [:<>
+   [:p name]
+   [:div {:style {:border-style "solid"
+                  :border-width "1px"}}
+    (visualize-function f)]])
+
+(defn inspection-util []
+  [:td {:style {:vertical-align "top"
+                :max-width "400px"}}
+   (visualize "Barrel Distortion" barrel-like-dist)
+   (visualize "Pincushion Distortion" pincushion-like-dist)])
+
 (defn canvas []
   (r/create-class
     {:component-did-mount
@@ -118,19 +157,26 @@
            :host node
            :update update-state
            :setup setup
-           :draw #(draw {:points  (lattice)
+           :draw #(draw {:points (lattice)
                          :centers (diamond-centers)})
            :size [(* 2 width) (* 2 height)]
            :middleware [m/fun-mode])))
      :render
-     (fn [] [:div])}))
+     (fn [] [:td])}))
+
 
 (defn ^:dev/after-load run []
-  (rdom/render [canvas state] (js/document.getElementById "app")))
+
+  (rdom/render [:div
+                [canvas state]
+                [inspection-util]] (js/document.getElementById "app")))
 
 (comment
   ;; switch to CLJS REPL
   (shadow/repl :app)
   (diamond-centers)
   (lattice)
+  (js/console line)
+  line
+  (.log js/console line)
   )
