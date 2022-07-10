@@ -1,35 +1,42 @@
 (ns distortion.app
-  (:require [reagent.core :as r]
-            [reagent.dom :as rdom]
-            [quil.core :as q]
+  (:require [quil.core :as q]
             [quil.middleware :as m]
+            [reagent.core :as r]
+            [reagent.dom :as rdom]
             ["d3" :as d3]))
 
 (def width 500)
 (def height 500)
-(def steps 80)
+(def steps 70)
 (def fps 20)
 (def not-zero 0.00001)
-
 
 (defn visualize-function [f]
   (let
     [size 300
-     data (into [] (map #(identity {:x % :y (f %)}) (range not-zero 20 0.1)))
+     data (into [] (map #(identity {:x % :y (f %)}) (range not-zero width)))
      x (->
          (d3/scaleLinear)
-         (.domain (into-array [(apply min (map :x data)) (apply max (map :x data))]))
+         (.domain (into-array [0 400]))
          (.range (into-array [not-zero size])))
      y (->
          (d3/scaleLinear)
-         (.domain (into-array [(apply min (map :y data)) (apply max (map :y data))]))
+         (.domain (into-array [-30 30]))
          (.range (into-array [size not-zero])))
      line (->
             (d3/line)
             (.x (fn [d] (x (:x d))))
-            (.y (fn [d] (y (:y d)))))]
+            (.y (fn [d] (y (:y d)))))
+     base-line (->
+                 (d3/line)
+                 (.x (fn [d] (x (:x d))))
+                 (.y (constantly (/ size 2))))]
     [:svg
      {:viewBox (str 0 " " 0 " " size " " size)}
+     [:path
+      {:d (base-line data),
+       :fill "transparent",
+       :stroke (second d3/schemeCategory10)}]
      [:path
       {:d (line data),
        :fill "transparent",
@@ -64,8 +71,12 @@
        (>= 0.5 relative-dist 0.3) :blue
        :else :yellow) colors)))
 
-(defn barrel-like-dist [undistorted]
-  (+ undistorted (* 2 (Math/pow (Math/log undistorted) 2)) (* 5 (Math/log undistorted))))
+(defn gaussian [[a b c] x]
+  (* a (Math/exp (- (/ (Math/pow (- x b) 2) (* 2 (Math/pow c 2)))))))
+
+;; good vizualization: y [-30 30] x [0 400]
+(defn barrel-like-distortion [undistorted]
+  (apply + (map #(gaussian % undistorted) [[7 0 100] [9 30 100] [9 -30 100]])))
 
 (defn pincushion-like-dist [undistorted]
   (+ undistorted (/ (Math/pow undistorted 1.8) 300) (* 3 (- (Math/log undistorted)))))
@@ -74,7 +85,7 @@
   (let [[v-x v-y] [(- x center-x) (- y center-y)]
         v-len (Math/sqrt (+ (Math/pow v-x 2) (Math/pow v-y 2)))
         [v-norm-x v-norm-y] [(/ v-x v-len) (/ v-y v-len)]
-        distorted (fn v-len)
+        distorted (+ v-len (fn v-len))
         [dist-x dist-y] [(* distorted v-norm-x) (* distorted v-norm-y)]]
     [(+ dist-x center-x) (+ dist-y center-y)]))
 
@@ -97,8 +108,8 @@
 
 (defn draw-diamonds [points centers]
   (let [distorted (->> points
-                    (apply-distortion pincushion-like-dist (get-in @state [:alpha :center]))
-                    (apply-distortion barrel-like-dist (get-in @state [:beta :center])))]
+                    #_(apply-distortion pincushion-like-dist (get-in @state [:alpha :center]))
+                    (apply-distortion barrel-like-distortion (get-in @state [:beta :center])))]
     (q/stroke (:blackish colors))
     (q/stroke-weight 2)
     (doseq [c centers]
@@ -144,8 +155,9 @@
 (defn inspection-util []
   [:td {:style {:vertical-align "top"
                 :max-width "400px"}}
-   (visualize "Barrel Distortion" barrel-like-dist)
-   (visualize "Pincushion Distortion" pincushion-like-dist)])
+   (visualize "Barrel new" barrel-like-distortion)
+
+   #_(visualize "Pincushion Distortion" pincushion-like-dist)])
 
 (defn canvas []
   (r/create-class
@@ -175,8 +187,6 @@
   ;; switch to CLJS REPL
   (shadow/repl :app)
   (diamond-centers)
-  (lattice)
-  (js/console line)
   line
   (.log js/console line)
   )
