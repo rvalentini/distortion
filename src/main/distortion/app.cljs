@@ -55,7 +55,6 @@
 
 ; TODO colorize separately and use colors that increase the optical magnification effect: "low" vs. "high"
 ; TODO refactor double distortion
-; TODO try to increase radius of the pincushion distortion
 
 (defn pol->cart [{:keys [angle r]}]
   (let [x (+ (/ width 2) (* r (Math/cos angle)))
@@ -78,14 +77,19 @@
 (defn barrel-like-distortion [undistorted]
   (apply + (map #(gaussian % undistorted) [[7 0 100] [9 30 100] [9 -30 100]])))
 
-(defn pincushion-like-dist [undistorted]
-  (+ undistorted (/ (Math/pow undistorted 1.8) 300) (* 3 (- (Math/log undistorted)))))
+(defn sigmoid [x mid steepness]
+  (/ 1 (+ 1 (Math/pow Math/E (* (- steepness) (- x mid))))))
+
+(defn pincushion-like-dist [undist]
+  (if (< undist 100)
+    (- (* (- 1 (sigmoid undist 50 0.1)) undist))
+    0))
 
 (defn distort [[x y] fn [center-x center-y]]
   (let [[v-x v-y] [(- x center-x) (- y center-y)]
         v-len (Math/sqrt (+ (Math/pow v-x 2) (Math/pow v-y 2)))
         [v-norm-x v-norm-y] [(/ v-x v-len) (/ v-y v-len)]
-        distorted (+ v-len (fn v-len))
+        distorted (+ v-len (fn v-len))                      ;TODO try some stuff with multiply
         [dist-x dist-y] [(* distorted v-norm-x) (* distorted v-norm-y)]]
     [(+ dist-x center-x) (+ dist-y center-y)]))
 
@@ -108,7 +112,7 @@
 
 (defn draw-diamonds [points centers]
   (let [distorted (->> points
-                    #_(apply-distortion pincushion-like-dist (get-in @state [:alpha :center]))
+                    (apply-distortion pincushion-like-dist (get-in @state [:alpha :center]))
                     (apply-distortion barrel-like-distortion (get-in @state [:beta :center])))]
     (q/stroke (:blackish colors))
     (q/stroke-weight 2)
@@ -155,9 +159,8 @@
 (defn inspection-util []
   [:td {:style {:vertical-align "top"
                 :max-width "400px"}}
-   (visualize "Barrel new" barrel-like-distortion)
-
-   #_(visualize "Pincushion Distortion" pincushion-like-dist)])
+   #_(visualize "Barrel new" barrel-like-distortion)
+   (visualize "Pincushion Distortion" pincushion-like-dist)])
 
 (defn canvas []
   (r/create-class
