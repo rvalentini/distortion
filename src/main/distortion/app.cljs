@@ -61,13 +61,18 @@
         y (+ (/ height 2) (* r (Math/sin angle)))]
     [x y]))
 
+(defn relative-dist-to-nearest-center [x y]
+  (->> (vals @state)
+    (map (comp pol->cart :center))
+    (map (fn [[c-x c-y]] (Math/sqrt (+ (Math/pow (- y c-y) 2) (Math/pow (- x c-x) 2)))))
+    (map (fn [dist] (/ dist (Math/sqrt (+ (Math/pow (* 0.5 height) 2) (Math/pow (* 0.5 width) 2))))))
+    (apply min)))
+
 (defn colorize [[x y]]
-  (let [[c-x c-y] (pol->cart (get-in @state [:beta :center]))
-        dist (Math/sqrt (+ (Math/pow (- y c-y) 2) (Math/pow (- x c-x) 2)))
-        relative-dist (/ dist (Math/sqrt (+ (Math/pow (* 0.5 height) 2) (Math/pow (* 0.5 width) 2))))]
+  (let [dist (relative-dist-to-nearest-center x y)]
     ((cond
-       (< relative-dist 0.3) :orange
-       (>= 0.5 relative-dist 0.3) :blue
+       (< dist 0.3) :orange
+       (>= 0.5 dist 0.3) :blue
        :else :yellow) colors)))
 
 (defn gaussian [[a b c] x]
