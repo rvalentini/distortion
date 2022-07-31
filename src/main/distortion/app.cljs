@@ -11,6 +11,7 @@
 (def fps 20)
 (def not-zero 0.00001)
 
+;TODO move to util ns
 (defn visualize-function [f]
   (let
     [size 300
@@ -48,13 +49,26 @@
              :orange [244 162 89]
              :blue [180 210 231]})
 
-(defonce state (r/atom {:alpha {:center {:angle 0
-                                         :r 150}}
-                        :beta {:center {:angle Math/PI
-                                        :r 150}}}))
+(declare sinoid-distortion)
+(declare pincushion-like-dist)
+(declare barrel-like-distortion)
+
+(def state (r/atom {:distortions [{:fun #'sinoid-distortion
+                                   :center {:angle 0
+                                            :r 150}
+                                   :update-frq 500}
+                                  {:fun #'pincushion-like-dist
+                                   :center {:angle Math/PI
+                                            :r 150}
+                                   :update-frq 100}
+                                  #_{:fun #'barrel-like-distortion
+                                   :center {:angle (/ Math/PI 2)
+                                            :r 150}
+                                   :update-frq 500}]}))
 
 ; TODO colorize separately and use colors that increase the optical magnification effect: "low" vs. "high"
 ; TODO refactor double distortion
+; TODO nice effect: let distortions move 'through' eachother
 
 (defn pol->cart [{:keys [angle r]}]
   (let [x (+ (/ width 2) (* r (Math/cos angle)))
@@ -62,7 +76,7 @@
     [x y]))
 
 (defn relative-dist-to-nearest-center [x y]
-  (->> (vals @state)
+  (->> (:distortions @state)
     (map (comp pol->cart :center))
     (map (fn [[c-x c-y]] (Math/sqrt (+ (Math/pow (- y c-y) 2) (Math/pow (- x c-x) 2)))))
     (map (fn [dist] (/ dist (Math/sqrt (+ (Math/pow (* 0.5 height) 2) (Math/pow (* 0.5 width) 2))))))
@@ -90,11 +104,14 @@
     (- (* (- 1 (sigmoid undist 50 0.1)) undist))
     0))
 
-(defn distort [[x y] fn [center-x center-y]]
+(defn sinoid-distortion [undist]
+  (* 4 (Math/sin undist)))
+
+(defn distort [[x y] fun [center-x center-y]]
   (let [[v-x v-y] [(- x center-x) (- y center-y)]
         v-len (Math/sqrt (+ (Math/pow v-x 2) (Math/pow v-y 2)))
         [v-norm-x v-norm-y] [(/ v-x v-len) (/ v-y v-len)]
-        distorted (+ v-len (fn v-len))                      ;TODO try some stuff with multiply
+        distorted (+ v-len (fun v-len))
         [dist-x dist-y] [(* distorted v-norm-x) (* distorted v-norm-y)]]
     [(+ dist-x center-x) (+ dist-y center-y)]))
 
@@ -109,16 +126,14 @@
 (defn map-each-point [f matrix]
   (mapv (fn [row] (mapv (fn [point] (f point)) row)) matrix))
 
-(defn apply-distortion [dist-fn center points]
-  (map-each-point (fn [p] (distort p dist-fn (pol->cart center))) points))
+(defn apply-distortion [points {:keys [fun center]}]
+  (map-each-point (fn [p] (distort p fun (pol->cart center))) points))
 
 (defn get-neighbors [[x y] points]
   (map #(get-in points %) [[x (dec y)] [(dec x) y] [(inc x) y] [x (inc y)]]))
 
 (defn draw-diamonds [points centers]
-  (let [distorted (->> points
-                    (apply-distortion pincushion-like-dist (get-in @state [:alpha :center]))
-                    (apply-distortion barrel-like-distortion (get-in @state [:beta :center])))]
+  (let [distorted (reduce #(apply-distortion %1 %2) points (:distortions @state))]
     (q/stroke (:blackish colors))
     (q/stroke-weight 2)
     (doseq [c centers]
@@ -134,13 +149,12 @@
   (let [r (range 0 steps)]
     (filter (fn [p] (every? even? p)) (for [i r j r] [i j]))))
 
-(defn move [center]
-  (update center :angle #(mod (+ % (/ Math/PI 100)) (* 2 Math/PI))))
+(defn move [distortion]
+  (update-in distortion [:center :angle]
+    #(mod (+ % (/ Math/PI (:update-frq distortion))) (* 2 Math/PI))))
 
 (defn update-state [state]
-  (swap! state #(-> %
-                  (update-in [:alpha :center] move)
-                  (update-in [:beta :center] move)))
+  (swap! state update :distortions #(map move %))
   state)
 
 (defn setup []
@@ -148,6 +162,7 @@
   (q/frame-rate fps)
   state)
 
+;TODO combine with centers into a single data structure?
 (defn lattice []
   (let [r (range 0 steps)
         w-scale (/ width steps)
