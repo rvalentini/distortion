@@ -62,13 +62,11 @@
                                             :r 150}
                                    :update-frq 100}
                                   #_{:fun #'barrel-like-distortion
-                                   :center {:angle (/ Math/PI 2)
-                                            :r 150}
-                                   :update-frq 500}]}))
+                                     :center {:angle (/ Math/PI 2)
+                                              :r 150}
+                                     :update-frq 500}]}))
 
 ; TODO colorize separately and use colors that increase the optical magnification effect: "low" vs. "high"
-; TODO refactor double distortion
-; TODO nice effect: let distortions move 'through' eachother
 
 (defn pol->cart [{:keys [angle r]}]
   (let [x (+ (/ width 2) (* r (Math/cos angle)))
@@ -115,13 +113,9 @@
         [dist-x dist-y] [(* distorted v-norm-x) (* distorted v-norm-y)]]
     [(+ dist-x center-x) (+ dist-y center-y)]))
 
-(defn draw-quad [[[t1 t2] [l1 l2] [r1 r2] [b1 b2]]]
-  (q/quad t1 t2 r1 r2 b1 b2 l1 l2))
-
-(defn draw-diamond [diamond]
+(defn draw-diamond [[[t1 t2] [l1 l2] [r1 r2] [b1 b2] :as diamond]]
   (when (every? some? diamond)
-    (q/with-fill [(colorize (first diamond))] (draw-quad diamond))))
-
+    (q/with-fill [(colorize (first diamond))] (q/quad t1 t2 r1 r2 b1 b2 l1 l2))))
 
 (defn map-each-point [f matrix]
   (mapv (fn [row] (mapv (fn [point] (f point)) row)) matrix))
@@ -129,25 +123,26 @@
 (defn apply-distortion [points {:keys [fun center]}]
   (map-each-point (fn [p] (distort p fun (pol->cart center))) points))
 
-(defn get-neighbors [[x y] points]
-  (map #(get-in points %) [[x (dec y)] [(dec x) y] [(inc x) y] [x (inc y)]]))
+(defn points->diamonds [points]
+  (->> (range 0 steps)
+    (#(for [i % j %] [i j]))
+    (filter #(every? even? %))
+    (map (fn [[x y]] [[x (dec y)] [(dec x) y] [(inc x) y] [x (inc y)]]))
+    (map #(map (fn [p] (get-in points p)) %))))
 
-(defn draw-diamonds [points centers]
-  (let [distorted (reduce #(apply-distortion %1 %2) points (:distortions @state))]
+(defn draw-diamonds [grid]
+  (let [distorted (reduce #(apply-distortion %1 %2) grid (:distortions @state))]
     (q/stroke (:blackish colors))
     (q/stroke-weight 2)
-    (doseq [c centers]
-      (draw-diamond (get-neighbors c distorted)))))
+    (doseq [d (points->diamonds distorted)]
+      (draw-diamond d))))
 
-(defn draw [{:keys [points centers]}]
+(defn draw [grid]
   (q/clear)
   (q/background 230 230 230)
   (q/with-translation [250 250]
-    (draw-diamonds points centers)))
+    (draw-diamonds grid)))
 
-(defn diamond-centers []
-  (let [r (range 0 steps)]
-    (filter (fn [p] (every? even? p)) (for [i r j r] [i j]))))
 
 (defn move [distortion]
   (update-in distortion [:center :angle]
@@ -162,8 +157,7 @@
   (q/frame-rate fps)
   state)
 
-;TODO combine with centers into a single data structure?
-(defn lattice []
+(defn build-grid []
   (let [r (range 0 steps)
         w-scale (/ width steps)
         h-scale (/ height steps)]
@@ -192,8 +186,7 @@
            :host node
            :update update-state
            :setup setup
-           :draw #(draw {:points (lattice)
-                         :centers (diamond-centers)})
+           :draw #(draw (build-grid))
            :size [(* 2 width) (* 2 height)]
            :middleware [m/fun-mode])))
      :render
@@ -201,7 +194,6 @@
 
 
 (defn ^:dev/after-load run []
-
   (rdom/render [:div
                 [canvas state]
                 [inspection-util]] (js/document.getElementById "app")))
@@ -209,7 +201,7 @@
 (comment
   ;; switch to CLJS REPL
   (shadow/repl :app)
-  (diamond-centers)
-  line
-  (.log js/console line)
+
+  (def lat (build-grid))
+  lat
   )
