@@ -1,48 +1,14 @@
 (ns distortion.app
-  (:require [quil.core :as q]
+  (:require [distortion.util :refer [inspector]]
+            [quil.core :as q]
             [quil.middleware :as m]
             [reagent.core :as r]
-            [reagent.dom :as rdom]
-            ["d3" :as d3]))
+            [reagent.dom :as rdom]))
 
 (def width 500)
 (def height 500)
 (def steps 70)
 (def fps 20)
-(def not-zero 0.00001)
-
-;TODO move to util ns
-(defn visualize-function [f]
-  (let
-    [size 300
-     data (into [] (map #(identity {:x % :y (f %)}) (range not-zero width)))
-     x (->
-         (d3/scaleLinear)
-         (.domain (into-array [0 400]))
-         (.range (into-array [not-zero size])))
-     y (->
-         (d3/scaleLinear)
-         (.domain (into-array [-30 30]))
-         (.range (into-array [size not-zero])))
-     line (->
-            (d3/line)
-            (.x (fn [d] (x (:x d))))
-            (.y (fn [d] (y (:y d)))))
-     base-line (->
-                 (d3/line)
-                 (.x (fn [d] (x (:x d))))
-                 (.y (constantly (/ size 2))))]
-    [:svg
-     {:viewBox (str 0 " " 0 " " size " " size)}
-     [:path
-      {:d (base-line data),
-       :fill "transparent",
-       :stroke (second d3/schemeCategory10)}]
-     [:path
-      {:d (line data),
-       :fill "transparent",
-       :stroke (first d3/schemeCategory10)}]]))
-
 
 (def colors {:blackish [50 0 0]
              :yellow [244 226 133]
@@ -50,7 +16,7 @@
              :blue [180 210 231]})
 
 (declare sinoid-distortion)
-(declare pincushion-like-dist)
+(declare pincushion-like-distortion)
 (declare barrel-like-distortion)
 
 (def state (r/atom {:distortions [{:f #'sinoid-distortion
@@ -58,9 +24,9 @@
                                             :r 150}
                                    :update-frq 500}
                                   #_{:f #'pincushion-like-distortion
-                                   :center {:angle Math/PI
-                                            :r 150}
-                                   :update-frq 100}
+                                     :center {:angle Math/PI
+                                              :r 150}
+                                     :update-frq 100}
                                   #_{:f #'barrel-like-distortion
                                      :center {:angle (/ Math/PI 2)
                                               :r 150}
@@ -118,6 +84,7 @@
 (defn apply-to-each-point [f grid]
   (mapv (fn [row] (mapv (fn [point] (f point)) row)) grid))
 
+;TODO avoid distorting points of the grid that are not rendered anyway -> [odd odd] and [even even]
 (defn apply-distortion [grid {:keys [f center]}]
   (apply-to-each-point (fn [p] (distort p f (pol->cart center))) grid))
 
@@ -160,19 +127,6 @@
         h-scale (/ height steps)]
     (vec (for [x r] (vec (for [y r] [(* w-scale x) (* h-scale y)]))))))
 
-(defn visualize [name f]
-  [:<>
-   [:p name]
-   [:div {:style {:border-style "solid"
-                  :border-width "1px"}}
-    (visualize-function f)]])
-
-(defn inspection-util []
-  [:td {:style {:vertical-align "top"
-                :max-width "400px"}}
-   #_(visualize "Barrel new" barrel-like-distortion)
-   (visualize "Pincushion Distortion" pincushion-like-distortion)])
-
 (defn canvas []
   (r/create-class
     {:component-did-mount
@@ -192,8 +146,12 @@
 
 (defn ^:dev/after-load run []
   (rdom/render [:div
-                [canvas state]
-                [inspection-util]] (js/document.getElementById "app")))
+                [canvas]
+                [inspector
+                 [{:name "Pincushion Distortion"
+                   :f pincushion-like-distortion}]
+                 width]]
+    (js/document.getElementById "app")))
 
 (comment
   ;; switch to CLJS REPL
