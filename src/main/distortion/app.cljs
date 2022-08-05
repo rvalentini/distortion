@@ -53,20 +53,19 @@
 (declare pincushion-like-dist)
 (declare barrel-like-distortion)
 
-(def state (r/atom {:distortions [{:fun #'sinoid-distortion
+(def state (r/atom {:distortions [{:f #'sinoid-distortion
                                    :center {:angle 0
                                             :r 150}
                                    :update-frq 500}
-                                  {:fun #'pincushion-like-dist
+                                  #_{:f #'pincushion-like-distortion
                                    :center {:angle Math/PI
                                             :r 150}
                                    :update-frq 100}
-                                  #_{:fun #'barrel-like-distortion
+                                  #_{:f #'barrel-like-distortion
                                      :center {:angle (/ Math/PI 2)
                                               :r 150}
                                      :update-frq 500}]}))
 
-; TODO colorize separately and use colors that increase the optical magnification effect: "low" vs. "high"
 
 (defn pol->cart [{:keys [angle r]}]
   (let [x (+ (/ width 2) (* r (Math/cos angle)))
@@ -97,33 +96,32 @@
 (defn sigmoid [x mid steepness]
   (/ 1 (+ 1 (Math/pow Math/E (* (- steepness) (- x mid))))))
 
-(defn pincushion-like-dist [undist]
-  (if (< undist 100)
-    (- (* (- 1 (sigmoid undist 50 0.1)) undist))
+(defn pincushion-like-distortion [undistorted]
+  (if (< undistorted 100)
+    (- (* (- 1 (sigmoid undistorted 50 0.1)) undistorted))
     0))
 
-(defn sinoid-distortion [undist]
-  (* 4 (Math/sin undist)))
+(defn sinoid-distortion [undistorted]
+  (* 4 (Math/sin undistorted)))
 
-(defn distort [[x y] fun [center-x center-y]]
+(defn distort [[x y] distortion-fn [center-x center-y]]
   (let [[v-x v-y] [(- x center-x) (- y center-y)]
         v-len (Math/sqrt (+ (Math/pow v-x 2) (Math/pow v-y 2)))
-        [v-norm-x v-norm-y] [(/ v-x v-len) (/ v-y v-len)]
-        distorted (+ v-len (fun v-len))
-        [dist-x dist-y] [(* distorted v-norm-x) (* distorted v-norm-y)]]
+        distorted (+ v-len (distortion-fn v-len))
+        [dist-x dist-y] [(* distorted (/ v-x v-len)) (* distorted (/ v-y v-len))]]
     [(+ dist-x center-x) (+ dist-y center-y)]))
 
 (defn draw-diamond [[[t1 t2] [l1 l2] [r1 r2] [b1 b2] :as diamond]]
   (when (every? some? diamond)
     (q/with-fill [(colorize (first diamond))] (q/quad t1 t2 r1 r2 b1 b2 l1 l2))))
 
-(defn map-each-point [f matrix]
-  (mapv (fn [row] (mapv (fn [point] (f point)) row)) matrix))
+(defn apply-to-each-point [f grid]
+  (mapv (fn [row] (mapv (fn [point] (f point)) row)) grid))
 
-(defn apply-distortion [points {:keys [fun center]}]
-  (map-each-point (fn [p] (distort p fun (pol->cart center))) points))
+(defn apply-distortion [grid {:keys [f center]}]
+  (apply-to-each-point (fn [p] (distort p f (pol->cart center))) grid))
 
-(defn points->diamonds [points]
+(defn grid->diamonds [points]
   (->> (range 0 steps)
     (#(for [i % j %] [i j]))
     (filter #(every? even? %))
@@ -131,10 +129,10 @@
     (map #(map (fn [p] (get-in points p)) %))))
 
 (defn draw-diamonds [grid]
-  (let [distorted (reduce #(apply-distortion %1 %2) grid (:distortions @state))]
+  (let [distorted-grid (reduce #(apply-distortion %1 %2) grid (:distortions @state))]
     (q/stroke (:blackish colors))
     (q/stroke-weight 2)
-    (doseq [d (points->diamonds distorted)]
+    (doseq [d (grid->diamonds distorted-grid)]
       (draw-diamond d))))
 
 (defn draw [grid]
@@ -142,7 +140,6 @@
   (q/background 230 230 230)
   (q/with-translation [250 250]
     (draw-diamonds grid)))
-
 
 (defn move [distortion]
   (update-in distortion [:center :angle]
@@ -174,7 +171,7 @@
   [:td {:style {:vertical-align "top"
                 :max-width "400px"}}
    #_(visualize "Barrel new" barrel-like-distortion)
-   (visualize "Pincushion Distortion" pincushion-like-dist)])
+   (visualize "Pincushion Distortion" pincushion-like-distortion)])
 
 (defn canvas []
   (r/create-class
