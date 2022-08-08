@@ -27,10 +27,10 @@
                                      :center {:angle Math/PI
                                               :r 150}
                                      :update-frq 100}
-                                  #_{:f #'barrel-like-distortion
-                                     :center {:angle (/ Math/PI 2)
-                                              :r 150}
-                                     :update-frq 500}]}))
+                                  {:f #'barrel-like-distortion
+                                   :center {:angle (/ Math/PI 2)
+                                            :r 150}
+                                   :update-frq 500}]}))
 
 
 (defn pol->cart [{:keys [angle r]}]
@@ -84,16 +84,15 @@
 (defn apply-to-each-point [f grid]
   (mapv (fn [row] (mapv (fn [point] (f point)) row)) grid))
 
-;TODO avoid distorting points of the grid that are not rendered anyway -> [odd odd] and [even even]
 (defn apply-distortion [grid {:keys [f center]}]
-  (apply-to-each-point (fn [p] (distort p f (pol->cart center))) grid))
+  (apply-to-each-point (fn [p] (some-> p (distort f (pol->cart center)))) grid))
 
-(defn grid->diamonds [points]
+(defn grid->diamonds [grid]
   (->> (range 0 steps)
     (#(for [i % j %] [i j]))
     (filter #(every? even? %))
     (map (fn [[x y]] [[x (dec y)] [(dec x) y] [(inc x) y] [x (inc y)]]))
-    (map #(map (fn [p] (get-in points p)) %))))
+    (map #(map (fn [p] (get-in grid p)) %))))
 
 (defn draw-diamonds [grid]
   (let [distorted-grid (reduce #(apply-distortion %1 %2) grid (:distortions @state))]
@@ -125,7 +124,10 @@
   (let [r (range 0 steps)
         w-scale (/ width steps)
         h-scale (/ height steps)]
-    (vec (for [x r] (vec (for [y r] [(* w-scale x) (* h-scale y)]))))))
+    (vec (for [x r]
+           (vec (for [y r]
+                  (when (not (even? (+ x y)))
+                    [(* w-scale x) (* h-scale y)])))))))
 
 (defn canvas []
   (r/create-class
@@ -149,7 +151,9 @@
                 [canvas]
                 [inspector
                  [{:name "Pincushion Distortion"
-                   :f pincushion-like-distortion}]
+                   :f pincushion-like-distortion}
+                  {:name "Barrel Distortion"
+                   :f barrel-like-distortion}]
                  width]]
     (js/document.getElementById "app")))
 
@@ -157,6 +161,4 @@
   ;; switch to CLJS REPL
   (shadow/repl :app)
 
-  (def lat (build-grid))
-  lat
   )

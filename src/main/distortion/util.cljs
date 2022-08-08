@@ -38,10 +38,8 @@
   [:td {:style {:vertical-align "top"
                 :max-width "400px"}}
    (for [{:keys [name f]} distortion-fns]
-     (do (println "name " name)
-         (println "called " (f 4.444))
-         [:<>
-          [:p name]
-          [:div {:style {:border-style "solid"
-                         :border-width "1px"}}
-           (visualize-function f width)]]))])
+     [:<>
+      [:p name]
+      [:div {:style {:border-style "solid"
+                     :border-width "1px"}}
+       (visualize-function f width)]])])
