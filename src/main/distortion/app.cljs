@@ -19,19 +19,24 @@
 (declare pincushion-like-distortion)
 (declare barrel-like-distortion)
 
-(def state (r/atom {:distortions [{:f #'sinoid-distortion
-                                   :center {:angle 0
-                                            :r 150}
-                                   :update-frq 500}
-                                  #_{:f #'pincushion-like-distortion
+(def state (r/atom {:distortions [#_{:f #'sinoid-distortion
+                                     :center {:angle 0
+                                              :r 150}
+                                     :update-frq 500}
+                                  {:f #'pincushion-like-distortion
                                      :center {:angle Math/PI
                                               :r 150}
                                      :update-frq 100}
                                   {:f #'barrel-like-distortion
                                    :center {:angle (/ Math/PI 2)
                                             :r 150}
-                                   :update-frq 500}]}))
+                                   :update-frq 150}]}))
 
+(defn mark-position [[x y] color]
+  (q/with-stroke (:blackish colors))
+  (q/stroke-weight 1)
+  (q/with-fill (color colors)
+    (q/ellipse x y 15 15)))
 
 (defn pol->cart [{:keys [angle r]}]
   (let [x (+ (/ width 2) (* r (Math/cos angle)))
@@ -52,20 +57,18 @@
        (>= 0.5 dist 0.3) :blue
        :else :yellow) colors)))
 
-(defn gaussian [[a b c] x]
-  (* a (Math/exp (- (/ (Math/pow (- x b) 2) (* 2 (Math/pow c 2)))))))
+(defn gaussian [sigma mu x]
+  (* (/ 1 (* mu (Math/sqrt (* 2 Math/PI))))
+    (Math/exp (- (/ (Math/pow (- x sigma) 2) (* 2 (Math/pow mu 2)))))))
 
-;; good vizualization: y [-30 30] x [0 400]
 (defn barrel-like-distortion [undistorted]
-  (apply + (map #(gaussian % undistorted) [[7 0 100] [9 30 100] [9 -30 100]])))
+  (* 5000 (gaussian 30 45 undistorted)))
 
 (defn sigmoid [x mid steepness]
   (/ 1 (+ 1 (Math/pow Math/E (* (- steepness) (- x mid))))))
 
 (defn pincushion-like-distortion [undistorted]
-  (if (< undistorted 100)
-    (- (* (- 1 (sigmoid undistorted 50 0.1)) undistorted))
-    0))
+  (- (* (- 1 (sigmoid undistorted 50 0.1)) undistorted)))
 
 (defn sinoid-distortion [undistorted]
   (* 4 (Math/sin undistorted)))
@@ -120,7 +123,7 @@
   (q/frame-rate fps)
   state)
 
-(defn build-grid []
+(defn grid []
   (let [r (range 0 steps)
         w-scale (/ width steps)
         h-scale (/ height steps)]
@@ -139,7 +142,7 @@
            :host node
            :update update-state
            :setup setup
-           :draw #(draw (build-grid))
+           :draw #(draw (grid))
            :size [(* 2 width) (* 2 height)]
            :middleware [m/fun-mode])))
      :render
@@ -150,8 +153,8 @@
   (rdom/render [:div
                 [canvas]
                 [inspector
-                 [{:name "Pincushion Distortion"
-                   :f pincushion-like-distortion}
+                 [#_{:name "Pincushion Distortion"
+                     :f pincushion-like-distortion}
                   {:name "Barrel Distortion"
                    :f barrel-like-distortion}]
                  width]]
