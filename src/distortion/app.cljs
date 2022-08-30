@@ -22,15 +22,15 @@
 (def state (r/atom {:distortions [#_{:f #'sinoid-distortion
                                      :center {:angle 0
                                               :r 150}
-                                     :update-frq 500}
+                                     :update-rate 500}
                                   {:f #'pincushion-like-distortion
                                      :center {:angle Math/PI
                                               :r 150}
-                                     :update-frq 100}
+                                     :update-rate 100}
                                   {:f #'barrel-like-distortion
                                    :center {:angle (/ Math/PI 2)
                                             :r 150}
-                                   :update-frq 150}]}))
+                                   :update-rate 150}]}))
 
 (defn mark-position [[x y] color]
   (q/with-stroke (:blackish colors))
@@ -112,7 +112,7 @@
 
 (defn move [distortion]
   (update-in distortion [:center :angle]
-    #(mod (+ % (/ Math/PI (:update-frq distortion))) (* 2 Math/PI))))
+    #(mod (+ % (/ Math/PI (:update-rate distortion))) (* 2 Math/PI))))
 
 (defn update-state [state]
   (swap! state update :distortions #(map move %))
@@ -138,7 +138,7 @@
      (fn [component]
        (let [node (rdom/dom-node component)]
          (q/sketch
-           :title "Red cross"
+           :title "Distortion"
            :host node
            :update update-state
            :setup setup
@@ -163,5 +163,4 @@
 (comment
   ;; switch to CLJS REPL
   (shadow/repl :app)
-
   )
